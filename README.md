@@ -10,7 +10,7 @@
 
 ---
 
-## 📌 Executive Summary
+## Executive Summary
 
 Predicting annual macroeconomic equity movements under small-sample constraints ($N = 21$ fiscal years, 2005–2025) presents a fundamental paradox:
 1. **Deep Neural Multimodal Networks** (such as Gated Fusion Networks and Tensor Fusion Networks) suffer from severe over-parameterization ($100+$ parameters on $\approx 20$ training samples), causing gradient collapse into the unconditional majority class ($TN = 0/4$, predicting 100% "Up").
@@ -24,7 +24,7 @@ Predicting annual macroeconomic equity movements under small-sample constraints 
 
 ---
 
-## 🏛️ System Architecture
+## System Architecture
 
 ![FinALFA Architecture](assets/finalfa_architecture.png)
 
@@ -72,7 +72,7 @@ The complete end-to-end framework is organized into four interconnected function
 
 ---
 
-## 📊 Comprehensive Empirical Benchmarks
+## Comprehensive Empirical Benchmarks
 
 ### 1. 13-Model Benchmark Comparison (LOOCV, 2005–2025)
 
@@ -139,7 +139,7 @@ Simulated annual rebalancing strategy from 2005 to 2025 (Initial Capital = 1.0):
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 FinALFA/
@@ -169,7 +169,7 @@ FinALFA/
 
 ---
 
-## 🚀 Quickstart & Reproducibility
+## Quickstart & Reproducibility
 
 ### 1. Environment Setup
 
@@ -217,7 +217,7 @@ jupyter notebook notebooks/Main_Project.ipynb
 
 ---
 
-## 📜 Citation
+## Citation
 
 If you use this codebase, models, or empirical findings in your research, please cite:
 
@@ -232,6 +232,6 @@ If you use this codebase, models, or empirical findings in your research, please
 
 ---
 
-## ⚖️ License
+## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
