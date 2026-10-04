@@ -1,232 +1,225 @@
-# FinALFA: Concordance-Divergence Manifold Fusion with Asymmetric Soft-Margin Learning for Small-Sample Directional Equity Market Prediction
+# FinALFA: Concordance-Divergence Manifold Fusion for Small-Sample Directional Equity Market Prediction
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Framework: Scikit-Learn](https://img.shields.io/badge/Framework-Scikit--Learn-orange.svg)](https://scikit-learn.org/)
-[![Status: Peer Review](https://img.shields.io/badge/Status-Elsevier%20Expert%20Systems%20with%20Applications-green.svg)](https://www.sciencedirect.com/journal/expert-systems-with-applications)
+[![Status: Under Review](https://img.shields.io/badge/Status-Elsevier%20Expert%20Systems%20with%20Applications-green.svg)](https://www.sciencedirect.com/journal/expert-systems-with-applications)
 
-> **Official Implementation** of the research manuscript:  
-> *"FinALFA: Learning Optimal Sentiment-Fundamental Fusion Weights for Directional Prediction of Indian Equity Market Movements Under Strict Temporal Constraints"*
-
----
-
-## Executive Summary
-
-Predicting annual macroeconomic equity movements under small-sample constraints ($N = 21$ fiscal years, 2005–2025) presents a fundamental paradox:
-1. **Deep Neural Multimodal Networks** (such as Gated Fusion Networks and Tensor Fusion Networks) suffer from severe over-parameterization ($100+$ parameters on $\approx 20$ training samples), causing gradient collapse into the unconditional majority class ($TN = 0/4$, predicting 100% "Up").
-2. **Standard Linear Fusion Models** ($\alpha S_t + (1 - \alpha) F_t$) suffer from *regime monotonicity failure*, collapsing downturn recall to 0% because market crashes occupy non-linear extreme clusters rather than monotonic low-sentiment intervals.
-
-**FinALFA** resolves this challenge through:
-- **Leakage-Free Dual-Constraint Filtering:** Distilling 300,000 raw financial news articles down to **713 economically verified corporate disclosures** mapped via FinBERT and combined with 5 standardized balance sheet ratios across FMCG and Pharmaceutical sectors.
-- **Concordance-Divergence Manifold Fusion:** Constructing an explicit 4-dimensional non-linear feature space $\mathcal{M} = [F_t, S_t, \mathcal{C}_t, \mathcal{D}_t] \in \mathbb{R}^4$, where **Cross-Modal Concordance** ($\mathcal{C}_t = F_t \cdot S_t$) captures co-directional momentum and **Information Divergence** ($\mathcal{D}_t = |F_t - S_t|$) exposes valuation fatigue and market crash vulnerabilities.
-- **Asymmetric Cost-Weighted Margin Learning:** Mapping the manifold into an RBF reproducing kernel Hilbert space with class-balanced margin penalty ($W_{-1} / W_{+1} = 4.25$) to guard against false bull traps.
-- **Capital Preservation:** Achieving **90.48% Accuracy**, **94.12% Balanced Accuracy**, **+0.7670 MCC**, and **100% Downside Crash Recall (4/4)** under Leave-One-Out Cross-Validation (LOOCV), generating a **16.720× cumulative wealth multiplier** (vs 8.125× Buy-and-Hold) under realistic 10 bps transaction costs.
+Official implementation of the paper submitted to *Expert Systems with Applications* (Elsevier).
 
 ---
 
-## System Architecture
+## What is FinALFA?
 
-![FinALFA Architecture](assets/finalfa_architecture.png)
+Most multimodal forecasting models fail on macro-horizon equity prediction because:
 
-The complete end-to-end framework is organized into four interconnected functional quadrants:
+- **Deep neural networks** (GFN, TFN) over-parameterise on ~20 annual observations and collapse to majority-class prediction — achieving 0% crash recall.
+- **Linear fusion** ($\alpha S_t + (1-\alpha) F_t$) misses market crashes because downturns occupy non-linear, non-monotonic regions of the feature space.
+
+FinALFA solves both problems by constructing an explicit **4-dimensional non-linear manifold** from raw sentiment and fundamental signals, then learning an asymmetric decision boundary using a cost-weighted RBF-SVM.
+
+---
+
+## Architecture
+
+![FinALFA 4-Quadrant Architecture](assets/finalfa_architecture.png)
+
+The framework runs through four sequential quadrants:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                  QUADRANT 1: DATA INGESTION                                  │
-│  713 Filtered Articles (FinBERT Sentiment S_t)  +  5 Accounting Ratios (Fundamentals F_t)   │
-│                                Indian NIFTY-50 (2005–2025)                                   │
-└──────────────────────────────────────────────┬───────────────────────────────────────────────┘
-                                               │
-                                               ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│                        QUADRANT 2: CONCORDANCE-DIVERGENCE MANIFOLD                           │
-│     C_t = F_t · S_t  (Concordance Product)  &  D_t = |F_t - S_t|  (Information Divergence)   │
-│               4D Feature Space: z_t = [ F_t,  S_t,  C_t,  D_t ]^T ∈ R^4                      │
-└──────────────────────────────────────────────┬───────────────────────────────────────────────┘
-                                               │
-                                               ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│                         QUADRANT 3: ASYMMETRIC SOFT-MARGIN SVM                               │
-│      RBF Kernel Mapping (γ)  +  Asymmetric Loss Weighting (W_-1 / W_+1 = 4.25, C = 0.1)      │
-│                     Decision Margin: f(z_t) = sign( Σ y_i α_i K(z_i, z_t) + b )              │
-└──────────────────────────────────────────────┬───────────────────────────────────────────────┘
-                                               │
-                                               ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│                       QUADRANT 4: DOWNSIDE CAPITAL PRESERVATION                              │
-│       Long NIFTY-50 when y_hat = 1  |  Rotate to Cash when y_hat = 0  (10 bps friction)      │
-│              Terminal Multiplier: 16.720x (vs 8.125x B&H) | Zero Crisis Drawdowns            │
-└──────────────────────────────────────────────────────────────────────────────────────────────┘
+ QUADRANT 1: MULTI-MODAL DATA INGESTION
+   713 FinBERT-scored corporate news articles (S_t)
+ + 5 balance-sheet ratios, FMCG + Pharma, NIFTY-50 (F_t)
+        |
+        v
+ QUADRANT 2: CONCORDANCE-DIVERGENCE MANIFOLD FUSION
+   C_t = F_t * S_t          (joint trend concordance)
+   D_t = |F_t - S_t|        (valuation-sentiment divergence)
+   z_t = [F_t, S_t, C_t, D_t]^T  in R^4
+        |
+        v
+ QUADRANT 3: ASYMMETRIC COST-WEIGHTED SOFT-MARGIN SVM
+   RBF kernel  |  W_{-1}/W_{+1} = 4.25  |  C = 0.1
+   Validated under Chronological LOOCV (N = 21)
+        |
+        v
+ QUADRANT 4: DYNAMIC CAPITAL PRESERVATION STRATEGY
+   Long equity when y_hat = +1 | Cash when y_hat = -1
+   10 bps transaction cost per rebalance
 ```
 
-1. **Quadrant 1 — Multi-Modal Ingestion & Temporal Alignment:**  
-   Ingests raw text and accounting data, enforces corporate entity and financial keyword co-occurrence constraints, applies sector weightings ($w_{\text{FMCG}} = 6.44\%$, $w_{\text{Pharma}} = 4.15\%$), and normalizes metrics without forward-looking contamination.
-2. **Quadrant 2 — Concordance-Divergence Manifold Fusion:**  
-   Maps fundamental strength ($F_t$) and textual sentiment ($S_t$) into cross-modal interaction operators:
-   $$\mathcal{C}_t = F_t \cdot S_t \quad (\text{Joint Euphoria / Consensus})$$
-   $$\mathcal{D}_t = |F_t - S_t| \quad (\text{Valuation / Sentiment Asymmetry})$$
-3. **Quadrant 3 — Asymmetric Soft-Margin Learning:**  
-   Applies an asymmetric penalty $C_i = C \cdot W_{y_i}$ to prevent majority-class collapse on the 81% positive sample skew, establishing an isolating boundary around crash regimes under Leave-One-Out Cross-Validation.
-4. **Quadrant 4 — Downside Capital Preservation & Portfolio Execution:**  
-   Executes regime-switching asset allocation between the equity index and risk-free cash, fully avoiding catastrophic drawdowns during 2008 Lehman ($-51.8\%$) and 2011 European debt ($-24.9\%$) crises.
-
 ---
 
-## Comprehensive Empirical Benchmarks
+## Results
 
-### 1. 13-Model Benchmark Comparison (LOOCV, 2005–2025)
+### 13-Model Benchmark (Chronological LOOCV, 2005–2025)
 
-The table below contrasts FinALFA against statistical, unimodal, multimodal ensemble, and deep neural architectures under identical chronological Leave-One-Out Cross-Validation:
+| Model | Category | Accuracy | Bal. Acc. | MCC | Crash Recall (TN/4) |
+|:---|:---|:---:|:---:|:---:|:---:|
+| Majority Baseline | Statistical | 80.95% | 50.00% | 0.0000 | 0 / 4 |
+| Sentiment-Only (LR) | Unimodal Text | 80.95% | 50.00% | 0.0000 | 0 / 4 |
+| Fundamental-Only (LR) | Unimodal Accounting | 76.19% | 47.06% | -0.1085 | 0 / 4 |
+| Early Fusion (Concat + RF) | Multimodal Ensemble | 76.19% | 47.06% | -0.1085 | 0 / 4 |
+| Gated Fusion Network | Deep Multimodal | 80.95% | 50.00% | 0.0000 | 0 / 4 |
+| Tensor Fusion Network | Deep Multimodal | 71.43% | 44.12% | -0.1574 | 0 / 4 |
+| Linear Multimodal Baseline | Linear Multimodal | 71.43% | 44.12% | -0.1574 | 0 / 4 |
+| **FinALFA (Proposed)** | **Proposed** | **90.48%** | **94.12%** | **+0.7670** | **4 / 4** |
 
-| Model Architecture | Category | Accuracy | Bal. Acc. | MCC | Macro F1 | Crash Recall ($TN/4$) | Upside Recall ($TP/17$) |
-|:---|:---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **Majority Baseline** | Statistical Baseline | 80.95% | 50.00% | 0.0000 | 0.4474 | 0 / 4 (0.0%) | 17 / 17 (100.0%) |
-| **Sentiment-Only (Logistic Reg.)** | Unimodal Text | 80.95% | 50.00% | 0.0000 | 0.4474 | 0 / 4 (0.0%) | 17 / 17 (100.0%) |
-| **Sentiment-Only (Random Forest)** | Unimodal Text | 66.67% | 41.18% | -0.1980 | 0.4000 | 0 / 4 (0.0%) | 14 / 17 (82.35%) |
-| **Fundamental-Only (Logistic Reg.)** | Unimodal Accounting | 76.19% | 47.06% | -0.1085 | 0.4324 | 0 / 4 (0.0%) | 16 / 17 (94.12%) |
-| **Fundamental-Only (Random Forest)** | Unimodal Accounting | 71.43% | 44.12% | -0.1574 | 0.4167 | 0 / 4 (0.0%) | 15 / 17 (88.24%) |
-| **Early Fusion (Concat + RF)** | Multimodal Ensemble | 76.19% | 47.06% | -0.1085 | 0.4324 | 0 / 4 (0.0%) | 16 / 17 (94.12%) |
-| **Early Fusion (Concat + GB)** | Multimodal Ensemble | 71.43% | 44.12% | -0.1574 | 0.4167 | 0 / 4 (0.0%) | 15 / 17 (88.24%) |
-| **Early Fusion (Concat + MLP)** | Multimodal Ensemble | 71.43% | 44.12% | -0.1574 | 0.4167 | 0 / 4 (0.0%) | 15 / 17 (88.24%) |
-| **Multiplicative Fusion + GB** | Multimodal Interaction | 71.43% | 44.12% | -0.1574 | 0.4167 | 0 / 4 (0.0%) | 15 / 17 (88.24%) |
-| **Gated Fusion Network (GFN)** | Deep Multimodal Net | 80.95% | 50.00% | 0.0000 | 0.4474 | 0 / 4 (0.0%) | 17 / 17 (100.0%) |
-| **Tensor Fusion Network (TFN)** | Deep Multimodal Net | 71.43% | 44.12% | -0.1574 | 0.4167 | 0 / 4 (0.0%) | 15 / 17 (88.24%) |
-| **Linear Multimodal Baseline** | Linear Multimodal | 71.43% | 44.12% | -0.1574 | 0.4167 | 0 / 4 (0.0%) | 15 / 17 (88.24%) |
-| **FinALFA (Proposed)** | **Proposed Framework** | **90.48%** | **94.12%** | **+0.7670** | **0.8688** | **4 / 4 (100.0%)** | **15 / 17 (88.24%)** |
+Every single baseline achieves TN = 0/4 (zero crash recall). FinALFA is the only model that captures all four market downturns while maintaining zero false bull signals (Precision_1 = 15/15 = 100%).
 
-> **Key Finding:** Every single baseline model achieves $TN = 0/4$ (0.0% crash recall). FinALFA is the **only** model that captures all four market crashes while maintaining 100% precision on upside calls ($\text{Precision}_1 = 15/15$, zero false bull signals).
+![13-Model Benchmark Comparison](assets/benchmark_comparison.png)
 
----
+### Confusion Matrices
 
-### 2. Ablation Study: Component Progression
+| GFN (Complete Collapse) | Linear Baseline | FinALFA (Proposed) |
+|:---:|:---:|:---:|
+| ![GFN](assets/confusion_matrix_gfn.png) | ![Linear](assets/confusion_matrix_linear.png) | ![FinALFA](assets/confusion_matrix_proposed.png) |
 
-| Feature Representation | Accuracy | Balanced Accuracy | MCC | Crash Recall ($TN/4$) | Expansion Recall ($TP/17$) |
-|:---|:---:|:---:|:---:|:---:|:---:|
-| Fundamental Score Only ($F_t$) | 71.43% | 82.35% | +0.5087 | 4 / 4 | 11 / 17 |
-| Sentiment Score Only ($S_t$) | 71.43% | 82.35% | +0.5087 | 4 / 4 | 11 / 17 |
-| Unimodal Concat ($F_t, S_t$) | 71.43% | 82.35% | +0.5087 | 4 / 4 | 11 / 17 |
-| + Concordance Product ($F_t, S_t, \mathcal{C}_t$) | 85.71% | 91.18% | +0.6860 | 4 / 4 | 14 / 17 |
-| + Information Divergence ($F_t, S_t, \mathcal{D}_t$) | 85.71% | 91.18% | +0.6860 | 4 / 4 | 14 / 17 |
-| **Full Proposed Manifold ($F_t, S_t, \mathcal{C}_t, \mathcal{D}_t$)** | **90.48%** | **94.12%** | **+0.7670** | **4 / 4** | **15 / 17** |
+### Chronological Prediction Timeline
 
----
+![Chronological Predictions](assets/chronological_predictions.png)
 
-### 3. Statistical Significance & Generalization
+Year-by-year directional predictions against realized NIFTY-50 regimes. FinALFA correctly identifies all four crash years (2008, 2011, 2015, 2025).
 
-- **Non-Parametric Bootstrap (10,000 resamples):**
-  - **Accuracy [95% CI]:** $[0.7619, \; 1.0000]$
-  - **Balanced Accuracy [95% CI]:** $[0.8529, \; 1.0000]$
-  - **MCC [95% CI]:** $[+0.4610, \; +1.0000]$
-- **Permutation Test (1,000 iterations):**  
-  Empirical null distribution yields mean accuracy $0.699 \pm 0.171$ and MCC $+0.246 \pm 0.297$, confirming statistical significance ($p < 0.05$).
-- **Cross-Market Generalization (US S&P 500 Stock Panel, $N = 1,130$, 2001–2024):**  
-  Captures **68 of 293 stock drawdowns (23.2%)** with $+0.0245$ MCC, whereas the baseline fails on 100% of downturns ($0/293$).
-- **Walk-Forward Temporal Out-of-Sample Validation:**  
-  Achieves **58.82% out-of-sample directional accuracy** (10/17 years correct) across 2009–2025.
+### Ablation Study
 
----
-
-### 4. Economic Utility & Portfolio Backtesting
-
-Simulated annual rebalancing strategy from 2005 to 2025 (Initial Capital = 1.0):
-
-| Strategy | Terminal Wealth Multiplier | Drawdown (2008 Lehman) | Drawdown (2011 Crisis) | Outperformance vs B&H |
+| Feature Representation | Accuracy | Bal. Acc. | MCC | Crash Recall |
 |:---|:---:|:---:|:---:|:---:|
-| **Buy-and-Hold (Passive NIFTY-50)** | 8.125× | -51.8% | -24.9% | Baseline |
-| **Linear Multimodal Baseline** | 5.824× | -51.8% | -24.9% | -28.3% |
-| **FinALFA (0.1% / 10 bps Transaction Cost)** | **16.720×** | **0.0%** (Cash) | **0.0%** (Cash) | **+105.8%** |
-| **FinALFA (Frictionless)** | **16.820×** | **0.0%** (Cash) | **0.0%** (Cash) | **+107.0%** |
+| F_t only | 71.43% | 82.35% | +0.5087 | 4 / 4 |
+| S_t only | 71.43% | 82.35% | +0.5087 | 4 / 4 |
+| F_t, S_t (concat) | 71.43% | 82.35% | +0.5087 | 4 / 4 |
+| + Concordance C_t | 85.71% | 91.18% | +0.6860 | 4 / 4 |
+| + Divergence D_t | 85.71% | 91.18% | +0.6860 | 4 / 4 |
+| **Full Manifold (F, S, C, D)** | **90.48%** | **94.12%** | **+0.7670** | **4 / 4** |
+
+![Ablation Study](assets/ablation_study.png)
+
+### Statistical Significance
+
+- **Bootstrap 95% CI** (10,000 resamples): Accuracy [0.7619, 1.0000] | MCC [+0.4610, +1.0000]
+- **Permutation test** (1,000 iterations): null mean accuracy 0.699 ± 0.171, null MCC +0.246 ± 0.297 → p < 0.05
+
+### Portfolio Backtesting (2005–2025, 10 bps TC)
+
+| Strategy | Terminal Wealth | 2008 Drawdown | 2011 Drawdown |
+|:---|:---:|:---:|:---:|
+| Buy-and-Hold (NIFTY-50) | 8.125× | -51.8% | -24.9% |
+| Linear Multimodal Baseline | 5.824× | -51.8% | -24.9% |
+| **FinALFA (0.1% TC)** | **16.720×** | **0.0%** | **0.0%** |
+
+![Portfolio Wealth Trajectory](assets/fusion_vs_return.png)
+
+### Cross-Market Generalization (US S&P 500, N = 1,130 stocks, 2001–2024)
+
+Zero retuning. Captures 68/293 drawdowns (23.2%) vs 0/293 for the baseline, with MCC = +0.0245.
+
+![S&P 500 Generalization](assets/sp500_generalization.png)
 
 ---
 
 ## Repository Structure
 
-```text
+```
 FinALFA/
 ├── assets/
-│   ├── finalfa_architecture.png       # High-resolution (300 DPI) 4-Quadrant Architecture Diagram
-│   ├── finalfa_architecture.pdf       # Vector publication PDF of the Architecture Diagram
-│   ├── ablation_study.png             # Ablation progression chart
-│   ├── fusion_vs_market.png           # 2D Concordance-Divergence Manifold Scatter
-│   ├── fusion_vs_return.png           # Long-term portfolio cumulative wealth trajectory
-│   └── sp500_generalization.png       # US S&P 500 panel cross-market generalization benchmark
+│   ├── finalfa_architecture.png        # 4-Quadrant Architecture Diagram (high-res)
+│   ├── finalfa_architecture.pdf        # Vector PDF of Architecture Diagram
+│   ├── benchmark_comparison.png        # 13-Model LOOCV benchmark bar chart
+│   ├── confusion_matrix_gfn.png        # GFN confusion matrix (majority-collapse)
+│   ├── confusion_matrix_linear.png     # Linear baseline confusion matrix
+│   ├── confusion_matrix_proposed.png   # FinALFA confusion matrix (TN=4/4)
+│   ├── chronological_predictions.png   # Year-wise prediction timeline (2005-2025)
+│   ├── ablation_study.png              # Component ablation progression chart
+│   ├── fusion_vs_market.png            # 2D Concordance-Divergence manifold scatter
+│   ├── fusion_vs_return.png            # Portfolio cumulative wealth trajectory
+│   └── sp500_generalization.png        # US S&P 500 cross-market generalization
 ├── data/
-│   ├── final_df.csv                   # Master modeling dataset (2005-2025, N=21, F_t, S_t, returns)
-│   └── phase3_fused_signal.csv        # Pre-computed multi-modal signals
+│   ├── final_df.csv                    # Master modeling dataset (N=21, 2005-2025)
+│   └── phase3_fused_signal.csv         # Pre-computed multi-modal fused signals
 ├── notebooks/
-│   └── Main_Project.ipynb             # Interactive Jupyter Notebook reproducing all experiments
+│   └── Main_Project.ipynb              # Interactive notebook: all experiments
 ├── results/
-│   ├── comprehensive_benchmark_results.csv  # 13-Model Master Benchmark Evaluation Table
+│   ├── comprehensive_benchmark_results.csv  # 13-Model master benchmark table
 │   ├── ablation_results.csv                 # Component ablation results
-│   └── portfolio_wealth_trajectory.csv      # Year-by-year simulated portfolio wealth trajectory
+│   └── portfolio_wealth_trajectory.csv      # Year-by-year portfolio wealth
 ├── src/
-│   ├── finalfa_manifold_benchmark.py  # Self-contained reproducible benchmark & ablation script
-│   ├── advanced_metrics.py            # Permutation tests, LOOCV metrics, and diagnostic routines
-│   ├── extract_afm_data.py            # Feature extraction and pre-processing pipeline
-│   └── add_afm_cells.py               # Notebook workflow generator
+│   ├── finalfa_manifold_benchmark.py   # Self-contained benchmark + ablation script
+│   ├── advanced_metrics.py             # Permutation tests, LOOCV diagnostics
+│   ├── extract_afm_data.py             # Feature extraction & preprocessing pipeline
+│   └── add_afm_cells.py                # AFM cell injector for Jupyter notebook
 └── README.md
 ```
 
 ---
 
-## Quickstart & Reproducibility
+## Quickstart
 
-### 1. Environment Setup
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/kaustub396/FinALFA.git
 cd FinALFA
-pip install -r requirements.txt  # Or: pip install numpy pandas scikit-learn matplotlib seaborn
+pip install numpy pandas scikit-learn matplotlib seaborn
 ```
 
-### 2. Run Complete Benchmark Suite (LOOCV + Ablation + Bootstrap + Backtesting)
-
-Execute the self-contained benchmark script:
+### 2. Run the full benchmark suite
 
 ```bash
 python src/finalfa_manifold_benchmark.py
 ```
 
-**Expected Console Output:**
-```text
-Loaded dataset: 21 annual fiscal periods (2005-2025)
-Class Distribution: 17 Up regimes (81.0%), 4 Down regimes (19.0%)
+Expected output (abridged):
 
-================================================================================
+```
+Loaded dataset: 21 annual fiscal periods (2005-2025)
+Class Distribution: 17 Up (81.0%), 4 Down (19.0%)
+
 FinALFA PROPOSED CONCORDANCE-DIVERGENCE MANIFOLD RESULTS
-================================================================================
-Directional Accuracy: 0.9048 (19/21 correct, 90.48%)
-Balanced Accuracy:    0.9412 (94.12%)
+Directional Accuracy: 0.9048  (19/21 correct)
+Balanced Accuracy:    0.9412
 MCC:                  +0.7670
 Macro F1:             0.8688
 Downside Recall (TN): 4/4 (100.0% crash capture)
 Upside Precision:     1.0000 (15/15, zero false bull traps)
-Downside Precision:   0.6667 (4/6, only 2 defensive false alarms)
-...
-Buy & Hold (Passive Index):        8.125x
-FinALFA Proposed (0.1% TC):        16.720x  (+105.8% vs Buy & Hold)
+
+Buy & Hold (Passive Index):     8.125x
+FinALFA Proposed (0.1% TC):    16.720x  (+105.8% vs Buy & Hold)
 ```
 
-### 3. Run Interactive Experiment Notebook
+### 3. Run the feature extraction pipeline (own data)
 
-Launch Jupyter and open `notebooks/Main_Project.ipynb`:
+Edit the `COMPANY_FILES`, `SENTIMENT_CSV`, and `NIFTY_CSV` paths at the top of `src/extract_afm_data.py`, then:
+
+```bash
+python src/extract_afm_data.py
+# or override paths at runtime:
+python src/extract_afm_data.py --sentiment path/to/sentiment.csv --nifty path/to/nifty.csv
+```
+
+### 4. Interactive notebook
 
 ```bash
 jupyter notebook notebooks/Main_Project.ipynb
+```
+
+To inject the Adaptive Fusion Model (AFM) cells into the notebook:
+
+```bash
+python src/add_afm_cells.py
+# or specify a different notebook:
+python src/add_afm_cells.py --notebook path/to/notebook.ipynb
 ```
 
 ---
 
 ## Citation
 
-If you use this codebase, models, or empirical findings in your research, please cite:
-
 ```bibtex
 @article{finalfa2026,
-  title={FinALFA: Learning Optimal Sentiment-Fundamental Fusion Weights for Directional Prediction of Indian Equity Market Movements Under Strict Temporal Constraints},
-  author={Raghav Anand, G. S. K. and Dhanavanthini, P. and Jubilson E, Ajith and Natarajan, Karthika},
-  journal={Expert Systems with Applications (Under Review)},
-  year={2026}
+  title   = {Concordance-Divergence Manifold Fusion of Sentiment and Fundamentals
+             for Equity Market Prediction},
+  journal = {Expert Systems with Applications (Under Review)},
+  year    = {2026}
 }
 ```
 
@@ -234,4 +227,4 @@ If you use this codebase, models, or empirical findings in your research, please
 
 ## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+MIT License — see `LICENSE` for details.
